@@ -28,14 +28,14 @@ stages:
         packageType: 'sdk' 
         version: '8.x' 
  
-    - script: dotnet restore ./AZ400_424/HelloWorldApp.csproj 
+    - script: dotnet restore AZ400_424/HelloWorldApp.csproj 
       displayName: "Restore" 
  
 
-    - script: dotnet build ./AZ400_424/HelloWorldApp.csproj --configuration $(BuildConfiguration) --no-restore 
+    - script: dotnet build AZ400_424/HelloWorldApp.csproj --configuration $(BuildConfiguration) --no-restore 
       displayName: "Build" 
 
-    - script: dotnet publish ./AZ400_424/HelloWorldApp.csproj --configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory) 
+    - script: dotnet publish AZ400_424/HelloWorldApp.csproj --configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory) 
       displayName: "Publish" 
 
     - task: PublishBuildArtifacts@1 
