@@ -1,34 +1,86 @@
-# ASP.NET Core (.NET Framework)
-# Build and test ASP.NET Core projects targeting the full .NET Framework.
-# Add steps that publish symbols, save build artifacts, and more:
-# https://docs.microsoft.com/azure/devops/pipelines/languages/dotnet-core
+trigger: 
+- main 
 
-trigger:
-- main
+variables: 
+  BuildConfiguration: 'Release' 
+  WebAppName: 'demo-webapp-424'   # <-- change this 
+  AzureServiceConnection: 'azure-devops'  # <-- change this 
 
-pool:
-  vmImage: 'windows-latest'
+stages: 
+# ========================= 
+# CI Stage - Build 
+# ========================= 
 
-variables:
-  solution: '**/*.sln'
-  buildPlatform: 'Any CPU'
-  buildConfiguration: 'Release'
+- stage: CI 
+  displayName: "CI - Build & Publish Artifact" 
 
-steps:
-- task: NuGetToolInstaller@1
+  jobs: 
+  - job: Build 
+    pool: 
+      vmImage: 'windows-latest' 
 
-- task: NuGetCommand@2
-  inputs:
-    restoreSolution: '$(solution)'
+    steps: 
+    - checkout: self 
+    - task: UseDotNet@2 
+      displayName: "Install .NET SDK" 
 
-- task: VSBuild@1
-  inputs:
-    solution: '$(solution)'
-    msbuildArgs: '/p:DeployOnBuild=true /p:WebPublishMethod=Package /p:PackageAsSingleFile=true /p:SkipInvalidConfigurations=true /p:DesktopBuildPackageLocation="$(build.artifactStagingDirectory)\WebApp.zip" /p:DeployIisAppPath="Default Web Site"'
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+      inputs: 
+        packageType: 'sdk' 
+        version: '8.x' 
+ 
+    - script: dotnet restore 
+      displayName: "Restore" 
+ 
 
-- task: VSTest@2
-  inputs:
-    platform: '$(buildPlatform)'
-    configuration: '$(buildConfiguration)'
+    - script: dotnet build --configuration $(BuildConfiguration) --no-restore 
+      displayName: "Build" 
+
+    - script: dotnet publish --configuration $(BuildConfiguration) --output $(Build.ArtifactStagingDirectory) 
+      displayName: "Publish" 
+
+    - task: PublishBuildArtifacts@1 
+      displayName: "Publish Artifact" 
+
+      inputs: 
+        PathtoPublish: '$(Build.ArtifactStagingDirectory)' 
+        ArtifactName: 'drop' 
+        publishLocation: 'Container' 
+
+ 
+
+ 
+
+# ========================= 
+
+# CD Stage - Deploy 
+
+# ========================= 
+
+- stage: CD 
+  displayName: "CD - Deploy to Azure App Service" 
+  dependsOn: CI 
+  condition: succeeded() 
+
+  jobs: 
+
+  - deployment: DeployWeb 
+    displayName: "Deploy Web App" 
+    environment: "dev" 
+    pool: 
+      vmImage: 'windows-latest' 
+
+    strategy: 
+      runOnce: 
+        deploy: 
+          steps: 
+          - download: current 
+            artifact: drop 
+
+          - task: AzureWebApp@1 
+            displayName: "Deploy to Azure App Service" 
+
+            inputs: 
+              azureSubscription: '$(AzureServiceConnection)' 
+              appType: 'webApp' 
+              appName: '$(WebAppName)' 
+              package: '$(Pipeline.Workspace)/drop' 
